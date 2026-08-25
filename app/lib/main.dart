@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:url_launcher/url_launcher.dart'; // PACOTE DE VÍDEO
 import 'login_screen.dart';
 
 void main() async {
@@ -82,6 +83,7 @@ class _FilaEsperaScreenState extends State<FilaEsperaScreen> {
 
     socket.on('suaVez', (dados) {
       if (mounted) {
+        String salaVideo = dados['salaVideo'];
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -90,12 +92,23 @@ class _FilaEsperaScreenState extends State<FilaEsperaScreen> {
             content: const Text('O médico está pronto para iniciar a chamada de vídeo.'),
             actions: [
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(context); // Fecha o aviso
-                  // Aqui futuramente abrirá a tela do Jitsi Meet (Vídeo)
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Abrindo câmera e microfone...')),
-                  );
+                  
+                  // Tira da fila da interface
+                  setState(() {
+                    naFila = false;
+                  });
+
+                  // Abre a câmera no Jitsi Meet
+                  final url = Uri.parse('https://meet.jit.si/$salaVideo');
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Erro ao abrir o vídeo. Tente novamente.')),
+                    );
+                  }
                 },
                 child: const Text('Entrar na Consulta'),
               )

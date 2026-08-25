@@ -41,10 +41,15 @@ io.on('connection', (socket) => {
   socket.on('atenderProximo', (medicoId) => {
     if (filaPacientes.length > 0) {
       const pacienteAtendido = filaPacientes.shift();
-      console.log(`Paciente ${pacienteAtendido.nome} encaminhado para o médico.`);
+      const salaVideo = `dr-feridas-${pacienteAtendido.id}`;
       
-      // Envia uma mensagem direta para o paciente informando que é a vez dele
-      io.to(pacienteAtendido.id).emit('suaVez', { medico: medicoId, salaVideo: `sala-${pacienteAtendido.id}` });
+      console.log(`Paciente ${pacienteAtendido.nome} encaminhado para a sala de vídeo: ${salaVideo}`);
+      
+      // Avisa o paciente que é a vez dele e manda o link
+      io.to(pacienteAtendido.id).emit('suaVez', { medico: medicoId, salaVideo: salaVideo });
+      
+      // Avisa o médico qual é a sala que ele deve entrar
+      socket.emit('entrarNaSalaMedico', { salaVideo: salaVideo, pacienteNome: pacienteAtendido.nome });
       
       // Atualiza a fila para todos os outros
       io.emit('atualizacaoFila', filaPacientes);

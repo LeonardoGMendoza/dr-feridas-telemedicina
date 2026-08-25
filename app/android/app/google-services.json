@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "517219400630",
+    "project_id": "dr-feridas-telemedicina",
+    "storage_bucket": "dr-feridas-telemedicina.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:517219400630:android:3f1256cdf84109ff51df17",
+        "android_client_info": {
+          "package_name": "com.example.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "517219400630-ba76jfsr6encjrglleamh978a1bmth38.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBQuCkVmyjHy1gQQxGLXM1S9slSOzAcUo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "517219400630-ba76jfsr6encjrglleamh978a1bmth38.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

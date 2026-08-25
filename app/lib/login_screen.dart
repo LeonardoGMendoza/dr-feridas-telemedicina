@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'main.dart'; // Para acessar o FilaEsperaScreen
+import 'medico_screen.dart'; // Para acessar o Painel Médico
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String _erro = '';
 
-  Future<void> _autenticar() async {
+  Future<void> _autenticarEmailSenha() async {
     setState(() {
       _loading = true;
       _erro = '';
@@ -35,7 +37,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      // Se deu certo, vai para a Fila de Espera
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -45,6 +46,41 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       setState(() {
         _erro = e.message ?? 'Ocorreu um erro de autenticação.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loginComGoogle() async {
+    setState(() {
+      _loading = true;
+      _erro = '';
+    });
+
+    try {
+      if (kIsWeb) {
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        await FirebaseAuth.instance.signInWithPopup(googleProvider);
+        
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const FilaEsperaScreen()),
+          );
+        }
+      } else {
+        setState(() {
+          _erro = 'O Login do Google no Android requer configurações extras. Por favor, teste no Chrome por enquanto!';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _erro = 'Erro ao logar com o Google: $e';
       });
     } finally {
       if (mounted) {
@@ -116,10 +152,24 @@ class _LoginScreenState extends State<LoginScreen> {
                             backgroundColor: Colors.red[700],
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          onPressed: _loading ? null : _autenticar,
+                          onPressed: _loading ? null : _autenticarEmailSenha,
                           child: _loading 
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : Text(_isLogin ? 'ENTRAR' : 'CADASTRAR', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            : Text(_isLogin ? 'ENTRAR' : 'CADASTRAR', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.grey),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: _loading ? null : _loginComGoogle,
+                          icon: Image.network('https://cdn-icons-png.flaticon.com/512/2991/2991148.png', height: 24),
+                          label: const Text('Entrar com o Google', style: TextStyle(fontSize: 16, color: Colors.black87)),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -134,6 +184,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           _isLogin ? 'Não tem conta? Cadastre-se aqui' : 'Já tem conta? Faça login',
                           style: const TextStyle(color: Colors.red),
                         ),
+                      ),
+                      const Divider(height: 32),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const MedicoScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.medical_services, color: Colors.blue),
+                        label: const Text('Acesso Restrito (Médicos)', style: TextStyle(color: Colors.blue)),
                       )
                     ],
                   ),
@@ -146,3 +207,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
