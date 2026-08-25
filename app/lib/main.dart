@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const ProntoSocorroApp());
 }
 
@@ -16,7 +23,7 @@ class ProntoSocorroApp extends StatelessWidget {
         primarySwatch: Colors.red,
         scaffoldBackgroundColor: Colors.grey[100],
       ),
-      home: const FilaEsperaScreen(),
+      home: const LoginScreen(), // Agora começa na tela de Login!
       debugShowCheckedModeBanner: false,
     );
   }
