@@ -13,6 +13,24 @@ class _MedicoScreenState extends State<MedicoScreen> {
   late IO.Socket socket;
   List filaPacientes = [];
 
+  // Banco de Dados Falso (Mock) de Prontuários
+  String obterHistorico(String? nome) {
+    if (nome == null) return 'Sem histórico localizado.';
+    
+    // Convertemos para minúsculo para facilitar a busca
+    String nomeBusca = nome.toLowerCase();
+
+    if (nomeBusca.contains('leonardo')) {
+      return 'Paciente diabético tipo 2. Última consulta em Dez/2025 para tratar úlcera venosa na perna direita. Alérgico a penicilina.';
+    } else if (nomeBusca.contains('sandra')) {
+      return 'Hipertensa controlada. Tratamento contínuo de ferida cirúrgica no abdômen. Última troca de curativo: há 2 dias.';
+    } else if (nomeBusca.contains('bruno')) {
+      return 'Sem histórico de doenças crônicas no sistema. Primeira consulta de triagem.';
+    }
+    
+    return 'Primeiro atendimento no sistema (Sem histórico).';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -20,7 +38,7 @@ class _MedicoScreenState extends State<MedicoScreen> {
   }
 
   void conectarServidor() {
-    socket = IO.io('http://localhost:3000', IO.OptionBuilder()
+    socket = IO.io('https://dr-feridas-telemedicina.onrender.com', IO.OptionBuilder()
       .setTransports(['websocket'])
       .disableAutoConnect()
       .build());
@@ -39,24 +57,27 @@ class _MedicoScreenState extends State<MedicoScreen> {
       }
     });
 
-    // O servidor manda o link do vídeo de volta pro médico também
-    socket.on('entrarNaSalaMedico', (dados) async {
-      String salaVideo = dados['salaVideo'];
-      
-      final url = Uri.parse('https://meet.jit.si/$salaVideo');
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      }
-    });
+    // O servidor cuidará de encaminhar o paciente
   }
 
   void chamarProximo() {
     if (filaPacientes.isNotEmpty) {
+      // 1. Pegamos o ID do primeiro paciente para gerar a mesma sala que o servidor gera
+      final pacienteId = filaPacientes.first['id'];
+      final salaVideo = 'dr-feridas-$pacienteId';
+
+      // 2. Avisamos o servidor para tirar ele da fila e mandar o paciente para a sala
       socket.emit('atenderProximo', 'Dr. Evandro');
       
+      // 3. O médico abre a sala IMEDIATAMENTE no momento do clique!
+      // Isso dribla o bloqueador de pop-ups do iPhone (Safari), que bloqueia links
+      // se não forem clicados diretamente pelo usuário.
+      final url = Uri.parse('https://meet.ffmuc.net/$salaVideo?config.disableDeepLinking=true');
+      launchUrl(url, mode: LaunchMode.externalApplication);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Paciente chamado! Abrindo sala de vídeo...'),
+          content: Text('Abrindo sala de vídeo...'),
           backgroundColor: Colors.green,
         ),
       );
@@ -143,7 +164,17 @@ class _MedicoScreenState extends State<MedicoScreen> {
                             title: Text(paciente['nome'] ?? 'Paciente', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 8.0),
-                              child: Text('Queixa: ${paciente['queixa']}'),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Motivo Hoje: ${paciente['queixa']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Historico (Prontuario):\n${obterHistorico(paciente['nome'])}',
+                                    style: TextStyle(color: Colors.grey[700], fontStyle: FontStyle.italic),
+                                  ),
+                                ],
+                              ),
                             ),
                             trailing: isPrimeiro
                                 ? ElevatedButton.icon(

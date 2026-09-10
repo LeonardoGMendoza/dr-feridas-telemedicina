@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'main.dart'; // Para acessar o FilaEsperaScreen
 import 'medico_screen.dart'; // Para acessar o Painel Médico
@@ -17,6 +18,32 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLogin = true;
   bool _loading = false;
   String _erro = '';
+
+  // INTELIGÊNCIA DO BANCO DE DADOS (VIDA REAL)
+  Future<void> _redirecionarPorPerfil() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.email != null) {
+      try {
+        // Vai no banco de dados perguntar: "Esse e-mail está na lista de médicos?"
+        final doc = await FirebaseFirestore.instance.collection('medicos').doc(user.email).get();
+        
+        if (mounted) {
+          if (doc.exists) {
+            // O Banco disse SIM! É médico. Vai pra tela azul.
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MedicoScreen()));
+          } else {
+            // O Banco disse NÃO! É paciente. Vai pra fila vermelha.
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const FilaEsperaScreen()));
+          }
+        }
+      } catch (e) {
+        // Se o banco ainda não estiver ativado, por segurança joga para a tela de paciente
+        if (mounted) {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const FilaEsperaScreen()));
+        }
+      }
+    }
+  }
 
   Future<void> _autenticarEmailSenha() async {
     setState(() {
@@ -37,12 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const FilaEsperaScreen()),
-        );
-      }
+      await _redirecionarPorPerfil();
     } on FirebaseAuthException catch (e) {
       setState(() {
         _erro = e.message ?? 'Ocorreu um erro de autenticação.';
@@ -67,12 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
         GoogleAuthProvider googleProvider = GoogleAuthProvider();
         await FirebaseAuth.instance.signInWithPopup(googleProvider);
         
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const FilaEsperaScreen()),
-          );
-        }
+        await _redirecionarPorPerfil();
       } else {
         setState(() {
           _erro = 'O Login do Google no Android requer configurações extras. Por favor, teste no Chrome por enquanto!';
@@ -112,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Icon(Icons.security, size: 64, color: Colors.red),
                       const SizedBox(height: 16),
                       Text(
-                        _isLogin ? 'Acesso ao Paciente' : 'Criar Conta',
+                        _isLogin ? 'Bem-vindo(a)' : 'Criar Conta',
                         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
@@ -184,17 +201,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           _isLogin ? 'Não tem conta? Cadastre-se aqui' : 'Já tem conta? Faça login',
                           style: const TextStyle(color: Colors.red),
                         ),
-                      ),
-                      const Divider(height: 32),
-                      TextButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const MedicoScreen()),
-                          );
-                        },
-                        icon: const Icon(Icons.medical_services, color: Colors.blue),
-                        label: const Text('Acesso Restrito (Médicos)', style: TextStyle(color: Colors.blue)),
                       )
                     ],
                   ),
@@ -203,7 +209,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }

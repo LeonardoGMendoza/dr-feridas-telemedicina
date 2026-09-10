@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:url_launcher/url_launcher.dart'; // PACOTE DE VÍDEO
@@ -52,8 +53,8 @@ class _FilaEsperaScreenState extends State<FilaEsperaScreen> {
   }
 
   void conectarServidor() {
-    // Conecta ao servidor Node.js local (ajustar IP se rodar no celular físico)
-    socket = IO.io('http://localhost:3000', IO.OptionBuilder()
+    // Conecta ao servidor Node.js no Render
+    socket = IO.io('https://dr-feridas-telemedicina.onrender.com', IO.OptionBuilder()
       .setTransports(['websocket'])
       .disableAutoConnect()
       .build());
@@ -100,8 +101,8 @@ class _FilaEsperaScreenState extends State<FilaEsperaScreen> {
                     naFila = false;
                   });
 
-                  // Abre a câmera no Jitsi Meet
-                  final url = Uri.parse('https://meet.jit.si/$salaVideo');
+                  // Abre a câmera num servidor Jitsi livre sem login e força abrir no navegador
+                  final url = Uri.parse('https://meet.ffmuc.net/$salaVideo?config.disableDeepLinking=true');
                   if (await canLaunchUrl(url)) {
                     await launchUrl(url, mode: LaunchMode.externalApplication);
                   } else {
@@ -157,58 +158,78 @@ class _FilaEsperaScreenState extends State<FilaEsperaScreen> {
   }
 
   Widget _buildFormularioEntrada() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    final user = FirebaseAuth.instance.currentUser;
+    final nomePaciente = user?.displayName ?? user?.email?.split('@')[0] ?? 'Paciente';
+
+    return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.local_hospital, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            const Text(
-              'Bem-vindo à Dr. Feridas',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Preencha seus dados para entrar na fila de triagem médica virtual.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _nomeController,
-              decoration: const InputDecoration(
-                labelText: 'Seu Nome Completo',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
+        child: Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.local_hospital, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Olá, $nomePaciente!',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Por favor, descreva o que está sentindo hoje para que o médico possa se preparar.',
+                    style: TextStyle(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _queixaController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Sintomas / Motivo da Consulta',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red[700],
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        // REMOVIDA A TRAVA! Agora o paciente não é obrigado a digitar nada.
+                        // Pode simplesmente entrar na fila com 1 clique.
+                        String queixaFinal = _queixaController.text.trim();
+                        if (queixaFinal.isEmpty) {
+                          queixaFinal = 'Retorno / Consulta de Rotina (Prontuário já preenchido)';
+                        }
+
+                        // O paciente pede para entrar na fila informando o nome (automático) e a queixa
+                        socket.emit('entrarFila', {
+                          'nome': nomePaciente,
+                          'queixa': queixaFinal,
+                        });
+
+                        setState(() {
+                          naFila = true;
+                        });
+                      },
+                      child: const Text('ENTRAR NA FILA', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  )
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _queixaController,
-              decoration: const InputDecoration(
-                labelText: 'Qual é a sua queixa ou ferida? (Opcional)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.healing),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[700],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: entrarNaFila,
-                child: const Text('ENTRAR NA FILA AGORA', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            )
-          ],
+          ),
         ),
       ),
     );
@@ -264,10 +285,43 @@ class _FilaEsperaScreenState extends State<FilaEsperaScreen> {
           ),
         ),
         const SizedBox(height: 32),
-        const Text(
-          '👨‍⚕️ Fique tranquilo! Nossos médicos (Dr. Evandro, Dra. Glória e equipe) já estão analisando a fila. Você será chamado em instantes.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16, color: Colors.grey, fontStyle: FontStyle.italic),
+        // NOVO: Painel de alinhamento de expectativa (Médicos de Plantão)
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Card(
+            color: Colors.blue[50],
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.medical_services, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text(
+                        'Equipe de Plantão Hoje',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '• Dr. Evandro\n• Dra. Glória\n• Dr. Alexander\n• Dr. Leonardo',
+                    style: TextStyle(fontSize: 16, height: 1.5, fontWeight: FontWeight.w500),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Para garantir o seu atendimento o mais rápido possível, você será chamado(a) pelo primeiro especialista que ficar livre.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700], fontStyle: FontStyle.italic),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );
